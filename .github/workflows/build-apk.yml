@@ -1,0 +1,56 @@
+name: Сборка APK
+
+on:
+  push:
+  workflow_dispatch:
+
+# Сборке нужен только доступ на чтение кода
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Ключ подписи
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > release.jks
+            echo "task=assembleRelease" >> "$GITHUB_OUTPUT"
+            echo "dir=release" >> "$GITHUB_OUTPUT"
+            echo "Собираем подписанную release-версию"
+          else
+            echo "::warning::Секреты KEYSTORE_B64 и KEYSTORE_PASSWORD не заданы — собирается отладочная версия. Обновления такой версии не будут ставиться поверх предыдущей. См. README, раздел «Постоянный ключ подписи»."
+            echo "task=assembleDebug" >> "$GITHUB_OUTPUT"
+            echo "dir=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Собрать APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: gradle ${{ steps.signing.outputs.task }} --no-daemon --stacktrace
+
+      - name: Удалить ключ из рабочей папки
+        if: always()
+        run: rm -f release.jks
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kommunalka-apk
+          path: app/build/outputs/apk/${{ steps.signing.outputs.dir }}/*.apk
+          if-no-files-found: error
