@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: в резервную копию и при переносе на новый телефон попадают только данные учёта -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="state.json" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="state.json" />
+    </device-transfer>
+</data-extraction-rules>
